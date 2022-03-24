@@ -1,0 +1,23 @@
+# --------------------------------------------------------------------------
+# Systemd service Definition for pi-bt-datalogger.service.
+#
+# The service starts the script /usr/local/sbin/pi-bt-datalogger.py
+#
+# Author: Bernhard Bablok
+# License: GPL3
+#
+# Website: https://github.com/bablokb/pi-bt-datalogger
+#
+# --------------------------------------------------------------------------
+
+[Unit]
+Description=Bluetooth Datalogger
+After=bluetooth.service
+Requires=bluetooth.service
+    
+[Service]
+ExecPreStart=/usr/bin/hciconfig hci0 piscan
+ExecStart=/usr/local/sbin/pi-bt-datalogger.py -t /var/log
+
+[Install]
+WantedBy=local-fs.target
