@@ -32,38 +32,59 @@ stop_event = threading.Event()
 
 # --- serve client   ------------------------------------------------
 
-def serve_client(info,sock):
+def serve_client(bt_mac,sock):
   """ serve single client """
 
-  try:
-    while True:
-      data = client_sock.recv(128)
-      if stop_event.is_set() or not data:
+  first = True
+  rest  = ""
+
+  # read-loop with timeout
+  sock.settimeout(5)
+  while True:
+    if stop_event.is_set():
+      print("%s: stop event detected." % bt_mac)
+      break
+    try:
+      data = client_sock.recv(1024)
+    except bluetooth.btcommon.BluetoothError as bte:
+      if bte.args[0] == "timed out":
+        continue
+      else:
         break
-      print("Received", data)
+
+    # no data means sender closed connection
+    if not data:
+      print("%s: disconnected." % bt_mac)
+      break
+    data = (rest + data.decode("utf-8")).split()
+    if first:
+      first = False
+    else:
+      for line in data[:-1]:
+        print("%s: %s" % (bt_mac,line),flush=True)
+    rest = data[-1:] if len(data)>1 else ""
+
+  # read-loop terminated
+  try:
+    sock.close()
   except:
     pass
   finally:
-    print("Disconnected.")
-    try:
-      sock.close()
-    except:
-      pass
-    finally:
-      if not stop_event.is_set():
-        del client_threads[info]
+    if not stop_event.is_set():
+      # no termination due to stop event: remove from thread-list
+      del client_threads[bt_mac]
 
 # --- main program   ------------------------------------------------
 
 if __name__ == '__main__':
   try:
+    print("Waiting for connection on RFCOMM channel",port)
     while True:
-      print("Waiting for connection on RFCOMM channel",port)
       client_sock, client_info = server_sock.accept()
       print("Accepted connection from", client_info)
       t = threading.Thread(target=serve_client,
-                           args=(client_info,client_sock))
-      client_threads[client_info] = t
+                           args=(client_info[0],client_sock))
+      client_threads[client_info[0]] = t
       t.start()
 
   except:
@@ -75,4 +96,4 @@ if __name__ == '__main__':
   except:
     pass
   map(threading.Thread.join,client_threads.values())
-  print("All done.")
+  print("datalogger finished")
